@@ -29,48 +29,51 @@
 				editing: false,
 			};
 			this.el = document.createElement('li');
-			this.registerEvents();
 			this.render();
 		}
 		registerEvents() {
-			this.el.addEventListener('dblclick', (e) => {
-				if (e.target === this.el.querySelector('label')) {
-					this.state.editing = true;
-					this.el.querySelector('input.edit').focus();
-					this.el.querySelector('input.edit').addEventListener('blur', (e) => {
-						e.preventDefault();
-						document.body.dispatchEvent(
-							new CustomEvent('todo.titlechanged', {
-								detail: {
-									id: this.state.todo.id,
-									title: this.el.querySelector('input.edit').value,
-								},
-							})
-						);
-						this.state.editing = false;
-					});
-				}
+			this.el.querySelector('label').addEventListener('dblclick', (e) => {
+				e.preventDefault();
+				this.state.editing = true;
+				this.el.querySelector('input.edit').focus();
 			});
 
-			this.el.addEventListener('keypress', (e) => {
+			this.el.querySelector('input.edit').addEventListener('blur', (e) => {
+				e.preventDefault();
+				document.body.dispatchEvent(
+					new CustomEvent('todo.titlechanged', {
+						detail: {
+							id: this.state.todo.id,
+							title: this.el.querySelector('input.edit').value,
+						},
+					})
+				);
+				this.state.editing = false;
+			});
+
+			this.el.querySelector('input.edit').addEventListener('keypress', (e) => {
 				if (e.key === 'Enter') {
 					e.preventDefault();
 					this.state.editing = false;
-					// hidding (as blur) will save the new value
 				}
 			});
 
-			this.el.addEventListener('click', (e) => {
-				if (e.target === this.el.querySelector('button.destroy')) {
+			this.el.querySelector('input.edit').addEventListener('keydown', (e) => {
+				if (e.key === 'Escape') {
 					e.preventDefault();
-					document.body.dispatchEvent(
-						new CustomEvent('todo.delete', {
-							detail: {
-								id: this.state.todo.id,
-							},
-						})
-					);
+					this.state.editing = false;
 				}
+			});
+
+			this.el.querySelector('button.destroy').addEventListener('click', (e) => {
+				e.preventDefault();
+				document.body.dispatchEvent(
+					new CustomEvent('todo.delete', {
+						detail: {
+							id: this.state.todo.id,
+						},
+					})
+				);
 			});
 		}
 		render() {
@@ -87,6 +90,8 @@
 
 			this.el.classList.toggle('completed', todo.completed);
 			this.el.classList.toggle('editing', editing);
+
+			this.registerEvents();
 
 			return this;
 		}
