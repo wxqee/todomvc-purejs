@@ -19,6 +19,10 @@
 				},
 			});
 		}
+
+		triggerEvent(eventName, detail) {
+			document.body.dispatchEvent(new CustomEvent(eventName, { detail }));
+		}
 	}
 
 	class TodoView extends View {
@@ -35,19 +39,25 @@
 			this.el.querySelector('label').addEventListener('dblclick', (e) => {
 				e.preventDefault();
 				this.state.editing = true;
-				this.el.querySelector('input.edit').focus();
+				// knowledge point: input focus and put cursor at the end
+				const input = this.el.querySelector('input.edit');
+				input.focus();
+				input.selectionStart = input.selectionEnd = input.value.length;
+			});
+
+			this.el.querySelector('input.toggle').addEventListener('change', (e) => {
+				this.triggerEvent('todo.completedchange', {
+					id: this.state.todo.id,
+					completed: e.target.checked,
+				});
 			});
 
 			this.el.querySelector('input.edit').addEventListener('blur', (e) => {
 				e.preventDefault();
-				document.body.dispatchEvent(
-					new CustomEvent('todo.titlechanged', {
-						detail: {
-							id: this.state.todo.id,
-							title: this.el.querySelector('input.edit').value,
-						},
-					})
-				);
+				this.triggerEvent('todo.titlechanged', {
+					id: this.state.todo.id,
+					title: this.el.querySelector('input.edit').value,
+				});
 				this.state.editing = false;
 			});
 
@@ -67,13 +77,7 @@
 
 			this.el.querySelector('button.destroy').addEventListener('click', (e) => {
 				e.preventDefault();
-				document.body.dispatchEvent(
-					new CustomEvent('todo.delete', {
-						detail: {
-							id: this.state.todo.id,
-						},
-					})
-				);
+				this.triggerEvent('todo.delete', { id: this.state.todo.id });
 			});
 		}
 		render() {
@@ -132,10 +136,6 @@
 			this.render();
 		}
 
-		renderHTML() {
-			return;
-		}
-
 		render() {
 			const { todos } = this.state;
 
@@ -150,26 +150,68 @@
 		}
 	}
 
-	const todos = [
-		{ id: 0, title: 1, completed: false },
-		{ id: 1, title: 2, completed: true },
-		{ id: 2, title: 3, completed: false },
-	];
+	class AppView extends View {
+		constructor() {
+			super();
 
-	const mainView = new MainSectionView({ todos });
+			this.el = document.querySelector('.todoapp');
 
-	document.body.addEventListener('todo.titlechanged', (e) => {
-		const { id, title } = e.detail;
-		todos.find((it) => id === it.id).title = title;
-		mainView.render();
-	});
+			this.state = {
+				todos: [
+					{ id: 0, title: 1, completed: false },
+					{ id: 1, title: 2, completed: true },
+					{ id: 2, title: 3, completed: false },
+				],
+			};
 
-	document.body.addEventListener('todo.delete', (e) => {
-		const { id } = e.detail;
-		todos.splice(
-			todos.findIndex((it) => id === it.id),
-			1
-		);
-		mainView.render();
-	});
+			this.render();
+			this.registerConsistEvents();
+		}
+		registerConsistEvents() {
+			document.body.addEventListener('todo.titlechanged', (e) => {
+				const { todos } = this.state;
+				const { id, title } = e.detail;
+				todos.find((it) => id === it.id).title = title;
+				this.state.todos = [...todos];
+			});
+
+			document.body.addEventListener('todo.delete', (e) => {
+				const { todos } = this.state;
+				const { id } = e.detail;
+				todos.splice(
+					todos.findIndex((it) => id === it.id),
+					1
+				);
+				this.state.todos = [...todos];
+			});
+
+			document.body.addEventListener('todo.completedchange', (e) => {
+				const { todos } = this.state;
+				const { id, completed } = e.detail;
+				todos.find((it) => id === it.id).completed = completed;
+				this.state.todos = [...todos];
+			});
+
+			this.el
+				.querySelector('input.new-todo')
+				.addEventListener('keydown', (e) => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						const { todos } = this.state;
+						todos.unshift({
+							id: Date.now(),
+							title: e.target.value,
+							completed: false,
+						});
+						this.el.querySelector('input.new-todo').value = '';
+						this.state.todos = [...todos];
+					}
+				});
+		}
+		render() {
+			new MainSectionView({ todos: this.state.todos });
+		}
+	}
+
+	new AppView();
 })(window);
