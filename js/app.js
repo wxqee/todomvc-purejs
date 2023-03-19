@@ -162,6 +162,7 @@
 			this.el = document.querySelector('.todoapp');
 
 			this.state = {
+				hash: '#/',
 				todos: [],
 			};
 
@@ -177,6 +178,19 @@
 		get incompletedCount() {
 			return this.state.todos.filter((todo) => !todo.completed).length;
 		}
+		get todos() {
+			return this.state.todos.filter((todo) => {
+				if (this.state.hash === '#/') {
+					return true;
+				} else if (this.state.hash === '#/active') {
+					return !todo.completed;
+				} else if (this.state.hash === '#/completed') {
+					return todo.completed;
+				} else {
+					return true;
+				}
+			});
+		}
 		save() {
 			localStorage.setItem('todos', JSON.stringify(this.state.todos));
 		}
@@ -187,8 +201,16 @@
 					this.state.todos = todos;
 				}
 			} catch (e) {}
+
+			// hash state default value is #/
+			this.state.hash = new URL(location.href).hash || '#/';
 		}
 		registerConsistEvents() {
+			window.addEventListener('hashchange', (e) => {
+				const newURL = new URL(e.newURL);
+				this.state.hash = newURL.hash;
+			});
+
 			document.body.addEventListener('todo.titlechanged', (e) => {
 				const { todos } = this.state;
 				const { id, title } = e.detail;
@@ -240,13 +262,18 @@
 		}
 		render() {
 			// Main section
-			new MainSectionView({ todos: this.state.todos });
+			new MainSectionView({ todos: this.todos });
 
-			// Footer
+			// Footer - Count
 			this.footer.querySelector('.todo-count strong').innerText =
 				this.incompletedCount;
 
-			// Clear Completed button
+			// Footer - Filter
+			this.footer.querySelectorAll('.filters a').forEach((a) => {
+				a.classList.toggle('selected', a.hash === this.state.hash);
+			});
+
+			// Footer - Clear Completed
 			if (this.state.todos.find((todo) => todo.completed)) {
 				this.footer.appendChild(this.clearBtn);
 			} else {
