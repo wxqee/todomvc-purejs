@@ -134,7 +134,7 @@
 	class MainSectionView extends View {
 		constructor({ todos }) {
 			super();
-			this.el = document.querySelector('.main'); // use existed dom
+			this.el = document.querySelector('.todo-list'); // use existed dom
 			this.state = {
 				todos,
 			};
@@ -143,11 +143,6 @@
 
 		render() {
 			const { todos } = this.state;
-
-			this.el.innerHTML = `
-			<input id="toggle-all" class="toggle-all" type="checkbox" />
-			<label for="toggle-all">Mark all as complete</label>
-			`;
 
 			this.el.replaceChildren(new TodoListView({ todos }).el);
 
@@ -166,6 +161,7 @@
 				todos: [],
 			};
 
+			this.allCompletedCbx = this.el.querySelector('.toggle-all');
 			this.footer = document.querySelector('.footer');
 			this.clearBtn = document.createElement('clearBtn');
 			this.clearBtn.className = 'clear-completed';
@@ -190,6 +186,9 @@
 					return true;
 				}
 			});
+		}
+		get allCompleted() {
+			return !this.state.todos.find((todo) => !todo.completed);
 		}
 		save() {
 			localStorage.setItem('todos', JSON.stringify(this.state.todos));
@@ -255,12 +254,20 @@
 					}
 				});
 
+			this.allCompletedCbx.addEventListener('change', (e) => {
+				this.todos.forEach((todo) => (todo.completed = e.target.checked));
+				this.state.todos = [...this.state.todos];
+			});
+
 			this.clearBtn.addEventListener('click', () => {
 				this.state.todos = this.state.todos.filter((todo) => !todo.completed);
 				this.save();
 			});
 		}
 		render() {
+			// Check All Completed
+			this.allCompletedCbx.checked = this.allCompleted;
+
 			// Main section
 			new MainSectionView({ todos: this.todos });
 
