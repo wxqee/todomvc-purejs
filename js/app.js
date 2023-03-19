@@ -165,9 +165,17 @@
 				todos: [],
 			};
 
+			this.footer = document.querySelector('.footer');
+			this.clearBtn = document.createElement('clearBtn');
+			this.clearBtn.className = 'clear-completed';
+			this.clearBtn.innerText = 'Clear completed';
+
 			this.render();
 			this.didMount();
 			this.registerConsistEvents();
+		}
+		get incompletedCount() {
+			return this.state.todos.filter((todo) => !todo.completed).length;
 		}
 		save() {
 			localStorage.setItem('todos', JSON.stringify(this.state.todos));
@@ -224,9 +232,28 @@
 						this.save();
 					}
 				});
+
+			this.clearBtn.addEventListener('click', () => {
+				this.state.todos = this.state.todos.filter((todo) => !todo.completed);
+				this.save();
+			});
 		}
 		render() {
+			// Main section
 			new MainSectionView({ todos: this.state.todos });
+
+			// Footer
+			this.footer.querySelector('.todo-count strong').innerText =
+				this.incompletedCount;
+
+			// Clear Completed button
+			if (this.state.todos.find((todo) => todo.completed)) {
+				this.footer.appendChild(this.clearBtn);
+			} else {
+				if (this.clearBtn.parentElement) {
+					this.footer.removeChild(this.clearBtn);
+				}
+			}
 		}
 	}
 
