@@ -14,7 +14,12 @@
 			this._state = new Proxy(this._state, {
 				set: (o, p, v) => {
 					const result = Reflect.set(o, p, v);
-					this.render();
+					if (typeof this.render === 'function') {
+						this.render();
+					}
+					if (typeof this.didUpdate === 'function') {
+						this.didUpdate();
+					}
 					return result;
 				},
 			});
@@ -157,15 +162,23 @@
 			this.el = document.querySelector('.todoapp');
 
 			this.state = {
-				todos: [
-					{ id: 0, title: 1, completed: false },
-					{ id: 1, title: 2, completed: true },
-					{ id: 2, title: 3, completed: false },
-				],
+				todos: [],
 			};
 
 			this.render();
+			this.didMount();
 			this.registerConsistEvents();
+		}
+		save() {
+			localStorage.setItem('todos', JSON.stringify(this.state.todos));
+		}
+		didMount() {
+			try {
+				let todos = JSON.parse(localStorage.getItem('todos'));
+				if (todos !== null) {
+					this.state.todos = todos;
+				}
+			} catch (e) {}
 		}
 		registerConsistEvents() {
 			document.body.addEventListener('todo.titlechanged', (e) => {
@@ -173,6 +186,7 @@
 				const { id, title } = e.detail;
 				todos.find((it) => id === it.id).title = title;
 				this.state.todos = [...todos];
+				this.save();
 			});
 
 			document.body.addEventListener('todo.delete', (e) => {
@@ -183,6 +197,7 @@
 					1
 				);
 				this.state.todos = [...todos];
+				this.save();
 			});
 
 			document.body.addEventListener('todo.completedchange', (e) => {
@@ -190,6 +205,7 @@
 				const { id, completed } = e.detail;
 				todos.find((it) => id === it.id).completed = completed;
 				this.state.todos = [...todos];
+				this.save();
 			});
 
 			this.el
@@ -205,6 +221,7 @@
 						});
 						this.el.querySelector('input.new-todo').value = '';
 						this.state.todos = [...todos];
+						this.save();
 					}
 				});
 		}
