@@ -4,7 +4,7 @@
 	// Your starting point. Enjoy the ride!
 	const state = new Proxy(
 		{
-			todos: [], // [{id, title, completed}]
+			todos: JSON.parse(localStorage.getItem("todomvc.todos")) || [], // [{id, title, completed}]
 			filters: [],
 			currentFilter: location.hash || "#/",
 			get isAllCompleted() {
@@ -20,6 +20,7 @@
 		{
 			set: (o, p, v) => {
 				const result = Reflect.set(o, p, v);
+				afterStateChange(o, p, v);
 				renderPage();
 				return result;
 			},
@@ -35,6 +36,12 @@
 		todoCount: document.querySelector(".todo-count strong"),
 		clearCompletedBtn: document.querySelector(".clear-completed"),
 	};
+
+	function afterStateChange(o, p, v) {
+		if (p === "todos") {
+			localStorage.setItem("todomvc.todos", JSON.stringify(o[p]));
+		}
+	}
 
 	function renderPage() {
 		// render toggle all
@@ -77,7 +84,23 @@
 				const li = app.todoItemTemplate.cloneNode(true);
 				li.classList.toggle("completed", todo.completed);
 				li.querySelector(".toggle").checked = todo.completed;
+
 				li.querySelector("label").innerText = todo.title;
+				li.querySelector("label").addEventListener("dblclick", (e) => {
+					li.classList.toggle("editing", true);
+				});
+
+				li.querySelector(".edit").value = todo.title;
+				li.querySelector(".edit").addEventListener("blur", (e) => {
+					e.preventDefault();
+					todo.title = e.target.value;
+					state.todos = [...state.todos];
+				});
+				li.querySelector(".edit").addEventListener("keypress", (e) => {
+					if (e.key === "Enter") {
+						li.classList.toggle("editing", false);
+					}
+				});
 
 				li.querySelector(".toggle").addEventListener("change", (e) => {
 					todo.completed = e.target.checked;
