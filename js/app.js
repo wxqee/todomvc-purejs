@@ -88,6 +88,8 @@
 				li.querySelector("label").innerText = todo.title;
 				li.querySelector("label").addEventListener("dblclick", (e) => {
 					li.classList.toggle("editing", true);
+					li.querySelector(".edit").value = todo.title;
+					li.querySelector(".edit").focus();
 				});
 
 				li.querySelector(".edit").value = todo.title;
