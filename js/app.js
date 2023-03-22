@@ -1,144 +1,316 @@
 (function (window) {
 	"use strict";
 
-	// Your starting point. Enjoy the ride!
-	const state = new Proxy(
-		{
-			todos: JSON.parse(localStorage.getItem("todomvc.todos")) || [], // [{id, title, completed}]
-			filters: [],
-			currentFilter: location.hash || "#/",
-			get isAllCompleted() {
-				return !this.todos.find((todo) => !todo.completed);
-			},
-			get activeCount() {
-				return this.todos.filter((todo) => !todo.completed).length;
-			},
-			get hasCompleted() {
-				return !!this.todos.find((todo) => todo.completed);
-			},
-		},
-		{
-			set: (o, p, v) => {
-				const result = Reflect.set(o, p, v);
-				afterStateChange(o, p, v);
-				renderPage();
-				return result;
-			},
-		}
-	);
+	// ------------------------------------------------------------
+	// State
+	// ------------------------------------------------------------
 
-	const app = {
-		newInput: document.querySelector(".new-todo"),
-		toggleAllBtn: document.querySelector(".toggle-all"),
-		todoList: document.querySelector(".todo-list"),
-		todoItemTemplate: document.querySelector(".todo-list li").cloneNode(true),
-		filterItems: document.querySelectorAll(".filters a"),
-		todoCount: document.querySelector(".todo-count strong"),
-		clearCompletedBtn: document.querySelector(".clear-completed"),
+	// reducer for better state managing
+	const types = Object.freeze({
+		ACTION_TODO_ADDED: "ACTION_TODO_ADDED",
+		ACTION_TODO_UPDATED: "ACTION_TODO_UPDATED",
+		ACTION_TODO_DELETED: "ACTION_TODO_DELETED",
+		ACTION_TODO_CLEAR_COMPLETED: "ACTION_TODO_CLEAR_COMPLETED",
+		ACTION_TODO_TOGGLE_ALL: "ACTION_TODO_TOGGLE_ALL",
+		ACTION_FILTER_CHANGED: "ACTION_FILTER_CHANGED",
+	});
+
+	const initialState = {
+		todos: [],
+		filter: "#/",
 	};
 
-	function afterStateChange(o, p, v) {
-		if (p === "todos") {
-			localStorage.setItem("todomvc.todos", JSON.stringify(o[p]));
+	function todosReducer(todos, action) {
+		if (action.type === types.ACTION_TODO_ADDED) {
+			return [
+				{
+					id: Date.now(),
+					title: action.title,
+					completed: false,
+				},
+				...todos,
+			];
+		} else if (action.type === types.ACTION_TODO_UPDATED) {
+			return todos.map((todo) => {
+				if (todo.id === action.todo.id) {
+					return action.todo;
+				} else {
+					return todo;
+				}
+			});
+		} else if (action.type === types.ACTION_TODO_DELETED) {
+			return todos.filter((todo) => todo.id !== action.id);
+		} else if (action.type === types.ACTION_TODO_CLEAR_COMPLETED) {
+			return todos.filter((todo) => !todo.completed);
+		} else if (action.type === types.ACTION_TODO_TOGGLE_ALL) {
+			return todos.map((todo) => {
+				todo.completed = action.completed;
+				return todo;
+			});
+		} else {
+			return todos;
 		}
 	}
 
-	function renderPage() {
-		// render toggle all
-		app.toggleAllBtn.checked = state.isAllCompleted;
-		app.toggleAllBtn.addEventListener("change", (e) => {
-			state.todos = state.todos.map((todo) => {
-				todo.completed = e.target.checked;
-				return todo;
-			});
-		});
-
-		// render new todo
-		app.newInput.addEventListener("keypress", (e) => {
-			if (e.key === "Enter" && e.target.value.trim()) {
-				state.todos.unshift({
-					id: Date.now(),
-					title: e.target.value,
-					completed: false,
-				});
-				state.todos = [...state.todos];
-				app.newInput.value = "";
-			}
-		});
-
-		// render todo list
-		app.todoList.innerHTML = "";
-		state.todos
-			.filter((todo) => {
-				if (state.currentFilter === "#/") {
-					return true;
-				} else if (state.currentFilter === "#/active") {
-					return !todo.completed;
-				} else if (state.currentFilter === "#/completed") {
-					return todo.completed;
-				} else {
-					return true;
-				}
-			})
-			.forEach((todo, index) => {
-				const li = app.todoItemTemplate.cloneNode(true);
-				li.classList.toggle("completed", todo.completed);
-				li.querySelector(".toggle").checked = todo.completed;
-
-				li.querySelector("label").innerText = todo.title;
-				li.querySelector("label").addEventListener("dblclick", (e) => {
-					li.classList.toggle("editing", true);
-					li.querySelector(".edit").value = todo.title;
-					li.querySelector(".edit").focus();
-				});
-
-				li.querySelector(".edit").value = todo.title;
-				li.querySelector(".edit").addEventListener("blur", (e) => {
-					e.preventDefault();
-					todo.title = e.target.value;
-					state.todos = [...state.todos];
-				});
-				li.querySelector(".edit").addEventListener("keypress", (e) => {
-					if (e.key === "Enter") {
-						li.classList.toggle("editing", false);
-					}
-				});
-
-				li.querySelector(".toggle").addEventListener("change", (e) => {
-					todo.completed = e.target.checked;
-					state.todos = [...state.todos];
-				});
-
-				li.querySelector(".destroy").addEventListener("click", () => {
-					state.todos.splice(index, 1);
-					state.todos = [...state.todos];
-				});
-
-				app.todoList.appendChild(li);
-			});
-
-		// render counts
-		app.todoCount.innerText = state.activeCount;
-
-		// render filters
-		app.filterItems.forEach((anchor) => {
-			const url = new URL(anchor.href);
-			anchor.classList.toggle("selected", url.hash === state.currentFilter);
-		});
-
-		// render clear completed
-		app.clearCompletedBtn.hidden = !state.hasCompleted;
-		app.clearCompletedBtn.addEventListener("click", (e) => {
-			e.preventDefault();
-			state.todos = state.todos.filter((todo) => !todo.completed);
-		});
-
-		// global hash change
-		window.addEventListener("hashchange", (e) => {
-			const url = new URL(e.newURL);
-			state.currentFilter = url.hash;
-		});
+	function filterReducer(filter, action) {
+		if (types.ACTION_FILTER_CHANGED === action.type) {
+			return action.filter;
+		} else {
+			return filter;
+		}
 	}
 
-	renderPage();
+	function stateReducer(state, action) {
+		return {
+			todos: todosReducer(state.todos, action),
+			filter: filterReducer(state.filter, action),
+		};
+	}
+
+	// context for sharing reducer between components
+	const StateContext = React.createContext(null);
+	const StateDispatchContext = React.createContext(null);
+
+	function StateProvider({ children }) {
+		const [state, dispatch] = React.useReducer(stateReducer, initialState);
+
+		return (
+			<StateContext.Provider value={state}>
+				<StateDispatchContext.Provider value={dispatch}>
+					{children}
+				</StateDispatchContext.Provider>
+			</StateContext.Provider>
+		);
+	}
+
+	function useStateContext() {
+		return React.useContext(StateContext);
+	}
+
+	function useStateDispatchContext() {
+		return React.useContext(StateDispatchContext);
+	}
+
+	// ------------------------------------------------------------
+	// Components
+	// ------------------------------------------------------------
+	function Header() {
+		const dispatch = useStateDispatchContext();
+
+		function handleKeyPress(e) {
+			if (e.key === "Enter") {
+				dispatch({
+					type: types.ACTION_TODO_ADDED,
+					title: e.target.value,
+				});
+				e.target.value = "";
+			}
+		}
+
+		return (
+			<header className="header">
+				<h1>todos</h1>
+				<input
+					className="new-todo"
+					placeholder="What needs to be done?"
+					autoFocus
+					onKeyPress={handleKeyPress}
+				/>
+			</header>
+		);
+	}
+
+	function Todo({ todo }) {
+		const dispatch = useStateDispatchContext();
+		const [editing, setEditing] = React.useState(false);
+
+		const inputRef = React.useRef(null);
+
+		React.useEffect(() => {
+			if (editing) {
+				inputRef.current.value = todo.title;
+				inputRef.current.focus();
+			}
+		}, [editing]);
+
+		const className = [];
+
+		if (todo.completed) {
+			className.push("completed");
+		}
+
+		if (editing) {
+			className.push("editing");
+		}
+
+		return (
+			<li key={todo.id} className={className.join(" ")}>
+				<div className="view">
+					<input
+						className="toggle"
+						type="checkbox"
+						checked={todo.completed}
+						onChange={(e) => {
+							dispatch({
+								type: types.ACTION_TODO_UPDATED,
+								todo: {
+									...todo,
+									completed: e.target.checked,
+								},
+							});
+						}}
+					/>
+					<label
+						onClick={(e) => {
+							if (e.detail === 2) {
+								setEditing(true);
+							}
+						}}
+					>
+						{todo.title}
+					</label>
+					<button
+						className="destroy"
+						onClick={() => {
+							dispatch({
+								type: types.ACTION_TODO_DELETED,
+								id: todo.id,
+							});
+						}}
+					></button>
+				</div>
+				<input
+					ref={inputRef}
+					className="edit"
+					defaultValue={todo.title}
+					onKeyPress={function (e) {
+						if (e.key === "Enter") {
+							setEditing(false);
+						}
+					}}
+					onBlur={(e) => {
+						setEditing(false);
+						dispatch({
+							type: types.ACTION_TODO_UPDATED,
+							todo: {
+								...todo,
+								title: e.target.value,
+							},
+						});
+					}}
+				/>
+			</li>
+		);
+	}
+
+	function Main() {
+		const { todos, filter } = useStateContext();
+		const dispatch = useStateDispatchContext();
+		const isAllCompleted = !todos.find((todo) => !todo.completed);
+
+		return (
+			<section className="main">
+				<input
+					id="toggle-all"
+					className="toggle-all"
+					type="checkbox"
+					checked={isAllCompleted}
+					onChange={(e) => {
+						dispatch({
+							type: types.ACTION_TODO_TOGGLE_ALL,
+							completed: e.target.checked,
+						});
+					}}
+				/>
+				<label for="toggle-all">Mark all as complete</label>
+				<ul className="todo-list">
+					{todos
+						.filter((todo) => {
+							if (filter === "#/") {
+								return true;
+							} else if (filter === "#/active") {
+								return !todo.completed;
+							} else if (filter === "#/completed") {
+								return todo.completed;
+							}
+						})
+						.map((todo) => (
+							<Todo todo={todo} />
+						))}
+				</ul>
+			</section>
+		);
+	}
+
+	function Footer() {
+		const { todos, filter } = useStateContext();
+		const dispatch = useStateDispatchContext();
+		const count = todos.filter((todo) => !todo.completed).length;
+
+		React.useEffect(() => {
+			dispatch({
+				type: types.ACTION_FILTER_CHANGED,
+				filter: location.hash,
+			});
+
+			window.addEventListener("hashchange", (e) => {
+				dispatch({
+					type: types.ACTION_FILTER_CHANGED,
+					filter: location.hash,
+				});
+			});
+		}, []);
+
+		function filterClassName(filterValue) {
+			return filterValue === filter ? "selected" : "";
+		}
+
+		return (
+			<footer className="footer">
+				<span className="todo-count">
+					<strong>{count}</strong> item left
+				</span>
+				<ul className="filters">
+					<li>
+						<a className={filterClassName("#/")} href="#/">
+							All
+						</a>
+					</li>
+					<li>
+						<a className={filterClassName("#/active")} href="#/active">
+							Active
+						</a>
+					</li>
+					<li>
+						<a className={filterClassName("#/completed")} href="#/completed">
+							Completed
+						</a>
+					</li>
+				</ul>
+				<button
+					className="clear-completed"
+					onClick={() => {
+						dispatch({
+							type: types.ACTION_TODO_CLEAR_COMPLETED,
+						});
+					}}
+				>
+					Clear completed
+				</button>
+			</footer>
+		);
+	}
+
+	function TodoApp() {
+		return (
+			<StateProvider>
+				<Header />
+				<Main />
+				<Footer />
+			</StateProvider>
+		);
+	}
+
+	const root = ReactDOM.createRoot(document.querySelector(".todoapp"));
+	root.render(<TodoApp />);
 })(window);
