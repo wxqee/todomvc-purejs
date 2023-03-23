@@ -54,7 +54,7 @@
 		// render new todo
 		app.newInput.addEventListener("keypress", (e) => {
 			if (e.key === "Enter" && e.target.value.trim()) {
-				state.todos.unshift({
+				state.todos.push({
 					id: Date.now(),
 					title: e.target.value,
 					completed: false,
