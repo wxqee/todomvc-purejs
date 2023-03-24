@@ -16,19 +16,19 @@
 	});
 
 	const initialState = {
-		todos: [],
+		todos: JSON.parse(localStorage.getItem("todos")) || [],
 		filter: "#/",
 	};
 
 	function todosReducer(todos, action) {
 		if (action.type === types.ACTION_TODO_ADDED) {
 			return [
+				...todos,
 				{
 					id: Date.now(),
 					title: action.title,
 					completed: false,
 				},
-				...todos,
 			];
 		} else if (action.type === types.ACTION_TODO_UPDATED) {
 			return todos.map((todo) => {
@@ -61,10 +61,16 @@
 	}
 
 	function stateReducer(state, action) {
-		return {
+		const newState = {
 			todos: todosReducer(state.todos, action),
 			filter: filterReducer(state.filter, action),
 		};
+
+		if (state.todos !== newState.todos) {
+			localStorage.setItem("todos", JSON.stringify(newState.todos));
+		}
+
+		return newState;
 	}
 
 	// context for sharing reducer between components
@@ -222,7 +228,7 @@
 						});
 					}}
 				/>
-				<label for="toggle-all">Mark all as complete</label>
+				<label htmlFor="toggle-all">Mark all as complete</label>
 				<ul className="todo-list">
 					{todos
 						.filter((todo) => {
@@ -235,7 +241,7 @@
 							}
 						})
 						.map((todo) => (
-							<Todo todo={todo} />
+							<Todo key={todo.id} todo={todo} />
 						))}
 				</ul>
 			</section>
